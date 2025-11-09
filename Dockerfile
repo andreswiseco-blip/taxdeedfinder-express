@@ -4,9 +4,10 @@ FROM node:18-alpine
 # Create app directory
 WORKDIR /usr/src/app
 
-# Install dependencies
+# Install dependencies (use npm install if package-lock.json may be absent in build context)
 COPY package*.json ./
-RUN npm ci --only=production
+# `npm ci` requires a package-lock.json; use `npm install --omit=dev` to install only production deps
+RUN npm install --omit=dev
 
 # Copy source
 COPY . .
