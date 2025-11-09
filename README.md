@@ -24,6 +24,26 @@ Notas:
 - `server.js` es el punto de entrada real. `package.json` fue corregido para apuntar a `server.js` y añadir `start`.
 - No hay base de datos ni integraciones externas en este MVP.
 
+Despliegue / Docker
+
+Este proyecto es un MVP mínimo pensado para correr en Node. Hay un `Dockerfile` incluido que crea una imagen ligera basada en Node 18:
+
+```bash
+# construir la imagen
+docker build -t taxdeedfinder-express:latest .
+
+# ejecutar (expone puerto 3000 por defecto, puede usar PORT env)
+docker run --rm -p 3000:3000 -e PORT=3000 taxdeedfinder-express:latest
+```
+
+Procfile
+
+Para plataformas tipo Heroku, hay un `Procfile` con la línea:
+
+```
+web: node server.js
+```
+
 Comandos útiles durante desarrollo:
 
 - Instalar dependencias:
