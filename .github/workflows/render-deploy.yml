@@ -4,6 +4,12 @@ on:
   push:
     branches: [ main ]
 
+# Ensure the workflow has permission to publish packages (GHCR)
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
