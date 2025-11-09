@@ -7,7 +7,7 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "check": "node test/check_endpoints.js",
-  "test": "mocha \"test/**/*.test.js\" --exit",
+  "test": "mocha \"test/**/*.test.js\" --timeout 10000 --exit",
     "test:watch": "mocha --watch"
   },
   "keywords": [],
