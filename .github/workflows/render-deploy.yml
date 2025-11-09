@@ -4,72 +4,36 @@ on:
   push:
     branches: [ main ]
 
-# Ensure the workflow has permission to publish packages (GHCR)
-permissions:
-  contents: read
-  packages: write
-  id-token: write
-
+# This workflow only triggers the deploy call to Render. Building and pushing
+# the image is handled by the separate `Publish Docker image` workflow.
+# The job is guarded by an `if` so it will be skipped (not fail) when the
+# required secrets are not present.
 jobs:
-  build-and-deploy:
+  trigger-deploy:
+    if: ${{ secrets.RENDER_API_KEY && secrets.RENDER_SERVICE_ID }}
     runs-on: ubuntu-latest
     env:
       IMAGE: ghcr.io/${{ github.repository }}
       IMAGE_TAG: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Optional: Log in to GHCR with PAT
-        if: ${{ secrets.GHCR_PAT != '' }}
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
-
-      - name: Build and push image to GHCR
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64
-          tags: |
-            ${{ env.IMAGE }}:latest
-            ${{ env.IMAGE }}:${{ env.IMAGE_TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
       - name: Trigger Render deploy
-        if: ${{ secrets.RENDER_API_KEY && secrets.RENDER_SERVICE_ID }}
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          IMAGE_REF: ${{ env.IMAGE }}:${{ env.IMAGE_TAG }}
         run: |
           set -euo pipefail
-          echo "Triggering deploy for service ${RENDER_SERVICE_ID}"
-          # send image reference so the Render service can use the exact image we pushed
-          # Build JSON payload without jq to avoid runner dependency
-          IMAGE_REF="${{ env.IMAGE }}:${{ env.IMAGE_TAG }}"
+          echo "Triggering Render deploy for service ${RENDER_SERVICE_ID} with image ${IMAGE_REF}"
           PAYLOAD=$(printf '{"message":"%s","metadata":{"image":"%s"}}' "Deploy from GitHub Actions" "$IMAGE_REF")
-          status=$(curl -s -o /tmp/render_resp.json -w "%{http_code}" -X POST "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys" \
+          resp=$(curl -s -w "\n%{http_code}" -X POST "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys" \
             -H "Authorization: Bearer ${RENDER_API_KEY}" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD")
-          echo "Render API HTTP status: $status"
-          echo "Render response:" && cat /tmp/render_resp.json || true
-          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
-            echo "Render deploy request failed (status: $status)"
+          body=$(echo "$resp" | sed '$d')
+          code=$(echo "$resp" | tail -n1)
+          echo "Render response code: $code"
+          echo "Render response body: $body"
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "Render deploy request failed (status: $code)"
             exit 1
           fi
