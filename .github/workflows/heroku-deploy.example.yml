@@ -1,0 +1,36 @@
+name: Heroku deploy (example)
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      HEROKU_APP: ${{ secrets.HEROKU_APP_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Heroku Container Registry
+        if: ${{ secrets.HEROKU_API_KEY != '' && secrets.HEROKU_APP_NAME != '' }}
+        run: |
+          echo "Pushing image to Heroku registry..."
+          echo ${{ secrets.HEROKU_API_KEY }} | docker login --username=_ --password-stdin registry.heroku.com
+
+      - name: Build and push image to Heroku registry
+        if: ${{ secrets.HEROKU_API_KEY != '' && secrets.HEROKU_APP_NAME != '' }}
+        run: |
+          docker build -t registry.heroku.com/${{ secrets.HEROKU_APP_NAME }}/web .
+          docker push registry.heroku.com/${{ secrets.HEROKU_APP_NAME }}/web
+
+      - name: Release on Heroku
+        if: ${{ secrets.HEROKU_API_KEY != '' && secrets.HEROKU_APP_NAME != '' }}
+        run: |
+          curl -n -X POST https://api.heroku.com/apps/${{ secrets.HEROKU_APP_NAME }}/formation \
+            -H "Accept: application/vnd.heroku+json; version=3" \
+            -H "Authorization: Bearer ${{ secrets.HEROKU_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"updates":[{"type":"web","docker_image":"registry.heroku.com/'${{ secrets.HEROKU_APP_NAME }}'/web:latest"}]}' || true
+
+# To enable: add HEROKU_API_KEY and HEROKU_APP_NAME to repo secrets and rename to heroku-deploy.yml

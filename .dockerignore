@@ -1,0 +1,10 @@
+node_modules
+.git
+npm-debug.log
+Dockerfile
+README.md
+test
+docs
+*.md
+package-lock.json
+.github
